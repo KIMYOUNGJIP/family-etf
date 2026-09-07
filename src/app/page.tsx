@@ -321,11 +321,11 @@ export default function DashboardPage() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
-        {/* Top Summary Metric Cards */}
-        <SummaryCards summary={summary} />
-
         {/* Real-time KOSPI & KOSDAQ Indices Intraday Charts */}
         <MarketIndices indices={indices} />
+
+        {/* Top Summary Metric Cards */}
+        <SummaryCards summary={summary} />
 
         {/* Charts Section */}
         <ChartsSection accounts={calculatedAccounts} />
