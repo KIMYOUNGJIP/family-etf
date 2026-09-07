@@ -9,10 +9,12 @@ import {
   CalculatedAccount,
   PortfolioSummary,
   TelegramConfig,
+  MarketIndexData,
 } from '@/lib/types';
 import { getMarketStatus, MarketStatus } from '@/lib/market';
 import { Header } from '@/components/Header';
 import { SummaryCards } from '@/components/SummaryCards';
+import { MarketIndices } from '@/components/MarketIndices';
 import { ChartsSection } from '@/components/ChartsSection';
 import { AccountColumn } from '@/components/AccountColumn';
 import { AccountTabs } from '@/components/AccountTabs';
@@ -29,6 +31,7 @@ export default function DashboardPage() {
     defaultPortfolio as PortfolioData
   );
   const [quotes, setQuotes] = useState<Record<string, StockQuote>>({});
+  const [indices, setIndices] = useState<Record<string, MarketIndexData>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string | null>(null);
   const [secondsUntilNextRefresh, setSecondsUntilNextRefresh] =
@@ -104,8 +107,8 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Fetch Quotes
-  const fetchQuotes = useCallback(async () => {
+  // Fetch Quotes & Indices
+  const fetchMarketData = useCallback(async () => {
     setIsRefreshing(true);
     try {
       const codes = Array.from(
@@ -114,23 +117,28 @@ export default function DashboardPage() {
         )
       );
 
-      if (codes.length === 0) {
-        setIsRefreshing(false);
-        return;
+      const [quotesRes, indicesRes] = await Promise.all([
+        codes.length > 0 ? fetch(`/api/quotes?codes=${codes.join(',')}`) : null,
+        fetch('/api/indices'),
+      ]);
+
+      if (quotesRes && quotesRes.ok) {
+        const quotesData = await quotesRes.json();
+        setQuotes(quotesData);
       }
 
-      const res = await fetch(`/api/quotes?codes=${codes.join(',')}`);
-      if (res.ok) {
-        const data = await res.json();
-        setQuotes(data);
-        const now = new Date();
-        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(
-          now.getMinutes()
-        ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-        setLastUpdatedTime(timeStr);
+      if (indicesRes && indicesRes.ok) {
+        const indicesData = await indicesRes.json();
+        setIndices(indicesData);
       }
+
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(
+        now.getMinutes()
+      ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      setLastUpdatedTime(timeStr);
     } catch (err) {
-      console.error('Failed to fetch real-time quotes:', err);
+      console.error('Failed to fetch real-time market data:', err);
     } finally {
       setIsRefreshing(false);
       setSecondsUntilNextRefresh(REFRESH_INTERVAL_SEC);
@@ -139,14 +147,14 @@ export default function DashboardPage() {
 
   // Initial fetch and 1-second countdown
   useEffect(() => {
-    fetchQuotes();
-  }, [fetchQuotes]);
+    fetchMarketData();
+  }, [fetchMarketData]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setSecondsUntilNextRefresh((prev) => {
         if (prev <= 1) {
-          fetchQuotes();
+          fetchMarketData();
           return REFRESH_INTERVAL_SEC;
         }
         return prev - 1;
@@ -154,7 +162,7 @@ export default function DashboardPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [fetchQuotes]);
+  }, [fetchMarketData]);
 
   // Calculations
   const { calculatedAccounts, summary } = useMemo(() => {
@@ -302,7 +310,7 @@ export default function DashboardPage() {
       <Header
         marketStatus={marketStatus}
         isRefreshing={isRefreshing}
-        onRefresh={fetchQuotes}
+        onRefresh={fetchMarketData}
         secondsUntilNextRefresh={secondsUntilNextRefresh}
         viewMode={viewMode}
         onToggleViewMode={setViewMode}
@@ -315,6 +323,9 @@ export default function DashboardPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
         {/* Top Summary Metric Cards */}
         <SummaryCards summary={summary} />
+
+        {/* Real-time KOSPI & KOSDAQ Indices Intraday Charts */}
+        <MarketIndices indices={indices} />
 
         {/* Charts Section */}
         <ChartsSection accounts={calculatedAccounts} />

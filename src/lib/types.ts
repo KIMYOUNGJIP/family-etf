@@ -77,6 +77,24 @@ export interface PortfolioSummary {
   updatedAt: string;
 }
 
+export interface MarketIndexPoint {
+  time: string;
+  price: number;
+}
+
+export interface MarketIndexData {
+  code: string;
+  name: string;
+  nowPrice: number;
+  diffPrice: number;
+  diffRate: number;
+  openPrice: number;
+  highPrice: number;
+  lowPrice: number;
+  chartPoints: MarketIndexPoint[];
+  updatedAt: string;
+}
+
 export interface TelegramConfig {
   botToken: string;
   chatId: string;
