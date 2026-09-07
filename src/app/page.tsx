@@ -327,9 +327,6 @@ export default function DashboardPage() {
         {/* Top Summary Metric Cards */}
         <SummaryCards summary={summary} />
 
-        {/* Charts Section */}
-        <ChartsSection accounts={calculatedAccounts} />
-
         {/* Account Views */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -368,6 +365,9 @@ export default function DashboardPage() {
             />
           )}
         </div>
+
+        {/* Charts Section (맨 아래 배치) */}
+        <ChartsSection accounts={calculatedAccounts} />
       </main>
 
       {/* Footer */}
