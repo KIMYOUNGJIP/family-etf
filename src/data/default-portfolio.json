@@ -1,0 +1,92 @@
+{
+  "updatedAt": "2026-09-07T09:00:00.000Z",
+  "accounts": [
+    {
+      "id": "acc-1",
+      "owner": "본인 (김영집)",
+      "nickname": "계좌 1",
+      "color": "indigo",
+      "cash": 0,
+      "holdings": [
+        {
+          "code": "0167A0",
+          "name": "SOL AI반도체TOP2플러스",
+          "quantity": 570,
+          "avgPrice": 27821
+        },
+        {
+          "code": "442580",
+          "name": "PLUS 글로벌HBM반도체",
+          "quantity": 50,
+          "avgPrice": 136676
+        },
+        {
+          "code": "426030",
+          "name": "TIME 미국나스닥100액티브",
+          "quantity": 67,
+          "avgPrice": 58702
+        }
+      ]
+    },
+    {
+      "id": "acc-3",
+      "owner": "첫째 (김은비)",
+      "nickname": "계좌 2",
+      "color": "amber",
+      "cash": 30636,
+      "holdings": [
+        {
+          "code": "0167A0",
+          "name": "SOL AI반도체TOP2플러스",
+          "quantity": 356,
+          "avgPrice": 28105
+        },
+        {
+          "code": "315960",
+          "name": "RISE 대형고배당10TR",
+          "quantity": 38,
+          "avgPrice": 95740
+        },
+        {
+          "code": "379800",
+          "name": "KODEX 미국S&P500TR",
+          "quantity": 132,
+          "avgPrice": 22750
+        },
+        {
+          "code": "379810",
+          "name": "KODEX 미국나스닥100TR",
+          "quantity": 121,
+          "avgPrice": 24481
+        }
+      ]
+    },
+    {
+      "id": "acc-2",
+      "owner": "둘째 (김하율)",
+      "nickname": "계좌 3",
+      "color": "emerald",
+      "cash": 20385,
+      "holdings": [
+        {
+          "code": "315960",
+          "name": "RISE 대형고배당10TR",
+          "quantity": 23,
+          "avgPrice": 95710
+        },
+        {
+          "code": "379800",
+          "name": "KODEX 미국S&P500TR",
+          "quantity": 88,
+          "avgPrice": 22735
+        },
+        {
+          "code": "379810",
+          "name": "KODEX 미국나스닥100TR",
+          "quantity": 85,
+          "avgPrice": 24627
+        }
+      ]
+    }
+  ]
+}
