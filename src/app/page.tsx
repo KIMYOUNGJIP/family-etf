@@ -10,6 +10,7 @@ import {
   PortfolioSummary,
   TelegramConfig,
   MarketIndexData,
+  InvestorTrend,
 } from '@/lib/types';
 import { getMarketStatus, MarketStatus } from '@/lib/market';
 import { Header } from '@/components/Header';
@@ -32,6 +33,9 @@ export default function DashboardPage() {
   );
   const [quotes, setQuotes] = useState<Record<string, StockQuote>>({});
   const [indices, setIndices] = useState<Record<string, MarketIndexData>>({});
+  const [investorTrends, setInvestorTrends] = useState<
+    Record<string, InvestorTrend>
+  >({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string | null>(null);
   const [secondsUntilNextRefresh, setSecondsUntilNextRefresh] =
@@ -129,7 +133,14 @@ export default function DashboardPage() {
 
       if (indicesRes && indicesRes.ok) {
         const indicesData = await indicesRes.json();
-        setIndices(indicesData);
+        if (indicesData.indices) {
+          setIndices(indicesData.indices);
+        } else {
+          setIndices(indicesData);
+        }
+        if (indicesData.investorTrends) {
+          setInvestorTrends(indicesData.investorTrends);
+        }
       }
 
       const now = new Date();
@@ -321,8 +332,8 @@ export default function DashboardPage() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
-        {/* Real-time KOSPI & KOSDAQ Indices Intraday Charts */}
-        <MarketIndices indices={indices} />
+        {/* Real-time KOSPI, KOSDAQ & FUT Indices and Investor Trends */}
+        <MarketIndices indices={indices} investorTrends={investorTrends} />
 
         {/* Top Summary Metric Cards */}
         <SummaryCards summary={summary} />

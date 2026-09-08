@@ -83,7 +83,7 @@ export interface MarketIndexPoint {
 }
 
 export interface MarketIndexData {
-  code: string;
+  code: string; // 'KOSPI' | 'KOSDAQ' | 'FUT'
   name: string;
   nowPrice: number;
   diffPrice: number;
@@ -92,6 +92,16 @@ export interface MarketIndexData {
   highPrice: number;
   lowPrice: number;
   chartPoints: MarketIndexPoint[];
+  updatedAt: string;
+}
+
+export interface InvestorTrend {
+  code: string; // 'KOSPI' | 'KOSDAQ' | 'FUT'
+  marketName: string;
+  unit: string; // '억 원' or '계약'
+  personal: number;      // 개인
+  foreign: number;       // 외국인
+  institutional: number; // 기관
   updatedAt: string;
 }
 

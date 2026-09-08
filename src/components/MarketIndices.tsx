@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MarketIndexData } from '@/lib/types';
-import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { MarketIndexData, InvestorTrend } from '@/lib/types';
+import { TrendingUp, TrendingDown, Activity, UserCheck } from 'lucide-react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -14,11 +14,13 @@ import {
 
 interface MarketIndicesProps {
   indices: Record<string, MarketIndexData>;
+  investorTrends?: Record<string, InvestorTrend>;
   isLoading?: boolean;
 }
 
 export const MarketIndices: React.FC<MarketIndicesProps> = ({
   indices,
+  investorTrends = {},
   isLoading,
 }) => {
   const [isMounted, setIsMounted] = useState(false);
@@ -29,12 +31,16 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
 
   const kospi = indices['KOSPI'];
   const kosdaq = indices['KOSDAQ'];
+  const fut = indices['FUT'];
 
   if (!isMounted) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
-        <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+      <div className="mb-6 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+          <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+          <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -54,7 +60,7 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
     const prices = item.chartPoints.map((p) => p.price);
     const minPrice = prices.length > 0 ? Math.min(...prices) : item.nowPrice * 0.98;
     const maxPrice = prices.length > 0 ? Math.max(...prices) : item.nowPrice * 1.02;
-    const padding = (maxPrice - minPrice) * 0.1 || 5;
+    const padding = (maxPrice - minPrice) * 0.1 || 2;
 
     return (
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between hover:border-slate-700 transition-all">
@@ -108,7 +114,7 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
         </div>
 
         {/* Intraday Sparkline / AreaChart */}
-        <div className="h-24 w-full my-1">
+        <div className="h-20 w-full my-1">
           {item.chartPoints.length > 1 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
@@ -165,7 +171,7 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
             </ResponsiveContainer>
           ) : (
             <div className="h-full flex items-center justify-center text-xs text-slate-500">
-              당일 차트 데이터 수집 중...
+              당일 분봉 차트 수집 중...
             </div>
           )}
         </div>
@@ -186,19 +192,107 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
     );
   };
 
+  const renderTrendRow = (
+    label: string,
+    val: number,
+    unit: string,
+    maxAbs: number
+  ) => {
+    const isBuy = val >= 0;
+    const barWidth = maxAbs > 0 ? Math.min(100, Math.round((Math.abs(val) / maxAbs) * 100)) : 0;
+
+    return (
+      <div className="flex items-center justify-between gap-2 text-xs py-1">
+        <span className="text-slate-400 w-10 flex-shrink-0 font-medium">
+          {label}
+        </span>
+        {/* Visual Bar Gauge */}
+        <div className="flex-1 bg-slate-950 h-2 rounded-full overflow-hidden flex items-center relative">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              isBuy ? 'bg-rose-500' : 'bg-blue-500'
+            }`}
+            style={{ width: `${barWidth}%` }}
+          />
+        </div>
+        {/* Value */}
+        <span
+          className={`font-bold font-mono text-right w-24 flex-shrink-0 ${
+            isBuy ? 'text-rose-400' : 'text-blue-400'
+          }`}
+        >
+          {isBuy ? '+' : ''}
+          {val.toLocaleString('ko-KR')}
+          <span className="text-[10px] text-slate-500 ml-0.5">{unit}</span>
+        </span>
+      </div>
+    );
+  };
+
+  const renderTrendCard = (trend?: InvestorTrend) => {
+    if (!trend) {
+      return (
+        <div className="h-36 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+      );
+    }
+
+    const maxVal = Math.max(
+      Math.abs(trend.personal),
+      Math.abs(trend.foreign),
+      Math.abs(trend.institutional),
+      1
+    );
+
+    return (
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl hover:border-slate-700 transition-all flex flex-col justify-between">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 mb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-white">
+              {trend.marketName} 수급
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              {trend.code}
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            단위: {trend.unit}
+          </span>
+        </div>
+
+        <div className="space-y-1.5">
+          {renderTrendRow('개인', trend.personal, trend.unit, maxVal)}
+          {renderTrendRow('외국인', trend.foreign, trend.unit, maxVal)}
+          {renderTrendRow('기관', trend.institutional, trend.unit, maxVal)}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-3 px-1">
-        <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+    <div className="mb-6 space-y-4">
+      {/* 1. Header */}
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5 text-indigo-400" />
-          <span>국내 대표 지수 실시간 당일 동향</span>
+          <span>국내 대표 지수 및 선물 실시간 당일 동향</span>
         </h3>
-        <span className="text-[11px] text-slate-500">당일 분봉 차트 실시간 연동</span>
+        <span className="text-[11px] text-slate-400">
+          코스피 · 코스닥 · 선물 실시간 분봉 및 수급
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 2. Top Row: 3 Indices Intraday Charts (KOSPI | KOSDAQ | FUT) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {renderIndexCard(kospi, '코스피')}
         {renderIndexCard(kosdaq, '코스닥')}
+        {renderIndexCard(fut, '코스피200 선물')}
+      </div>
+
+      {/* 3. Bottom Row: Investor Trends (Personal, Foreign, Institutional) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {renderTrendCard(investorTrends['KOSPI'])}
+        {renderTrendCard(investorTrends['KOSDAQ'])}
+        {renderTrendCard(investorTrends['FUT'])}
       </div>
     </div>
   );
