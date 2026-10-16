@@ -141,10 +141,16 @@ async function fetchInvestorTrend(code: 'KOSPI' | 'KOSDAQ' | 'FUT'): Promise<Inv
   }
 }
 
-async function fetchNasdaqFuturesData(): Promise<MarketIndexData | null> {
+async function fetchYahooChartData(
+  symbol: string,
+  code: string,
+  name: string,
+  interval = '2m'
+): Promise<MarketIndexData | null> {
   try {
-    const url =
-      'https://query1.finance.yahoo.com/v8/finance/chart/NQ=F?interval=2m&range=1d';
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+      symbol
+    )}?interval=${interval}&range=1d`;
     const res = await fetch(url, {
       headers: {
         'User-Agent':
@@ -155,7 +161,7 @@ async function fetchNasdaqFuturesData(): Promise<MarketIndexData | null> {
     });
 
     if (!res.ok) {
-      console.error(`Failed to fetch NQ=F: ${res.status}`);
+      console.error(`Failed to fetch ${symbol}: ${res.status}`);
       return null;
     }
 
@@ -183,7 +189,7 @@ async function fetchNasdaqFuturesData(): Promise<MarketIndexData | null> {
     const chartPoints: MarketIndexPoint[] = [];
     for (let i = 0; i < timestamps.length; i++) {
       const price = closes[i];
-      if (price !== null && price !== undefined && !isNaN(price)) {
+      if (price !== null && price !== undefined && !isNaN(price) && price > 0) {
         const date = new Date(timestamps[i] * 1000);
         const timeStr = date.toLocaleTimeString('ko-KR', {
           timeZone: 'Asia/Seoul',
@@ -202,8 +208,8 @@ async function fetchNasdaqFuturesData(): Promise<MarketIndexData | null> {
       chartPoints.length > 0 ? chartPoints[0].price : nowPrice;
 
     return {
-      code: 'NQ',
-      name: '미니나스닥 100 선물',
+      code,
+      name,
       nowPrice,
       diffPrice,
       diffRate,
@@ -214,7 +220,7 @@ async function fetchNasdaqFuturesData(): Promise<MarketIndexData | null> {
       updatedAt: new Date().toISOString(),
     };
   } catch (err) {
-    console.error('Error fetching Nasdaq futures:', err);
+    console.error(`Error fetching ${symbol}:`, err);
     return null;
   }
 }
@@ -229,12 +235,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const [kospi, kosdaq, fut, nq, kospiTrend, kosdaqTrend, futTrend] =
+  const [kospi, kosdaq, fut, nq, usdkrw, kospiTrend, kosdaqTrend, futTrend] =
     await Promise.all([
       fetchIndexData('KOSPI'),
       fetchIndexData('KOSDAQ'),
       fetchIndexData('FUT'),
-      fetchNasdaqFuturesData(),
+      fetchYahooChartData('NQ=F', 'NQ', '미니나스닥 100 선물', '2m'),
+      fetchYahooChartData('KRW=X', 'USDKRW', '원/달러 환율', '5m'),
       fetchInvestorTrend('KOSPI'),
       fetchInvestorTrend('KOSDAQ'),
       fetchInvestorTrend('FUT'),
@@ -245,6 +252,7 @@ export async function GET(request: NextRequest) {
   if (kosdaq) indices['KOSDAQ'] = kosdaq;
   if (fut) indices['FUT'] = fut;
   if (nq) indices['NQ'] = nq;
+  if (usdkrw) indices['USDKRW'] = usdkrw;
 
   const investorTrends: Record<string, InvestorTrend> = {};
   if (kospiTrend) investorTrends['KOSPI'] = kospiTrend;

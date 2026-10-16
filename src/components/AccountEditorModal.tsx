@@ -2,7 +2,16 @@
 
 import React, { useState } from 'react';
 import { Account, Holding } from '@/lib/types';
-import { X, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Trash2,
+  Save,
+  Calculator,
+  ChevronUp,
+  ChevronDown,
+  Check,
+} from 'lucide-react';
 
 interface AccountEditorModalProps {
   account: Account | null;
@@ -27,6 +36,58 @@ export const AccountEditorModal: React.FC<AccountEditorModalProps> = ({
   const [newAvgPrice, setNewAvgPrice] = useState<number>(10000);
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // 추가 매수 평단가 자동 계산기 상태
+  const [calcOpenIdx, setCalcOpenIdx] = useState<number | null>(null);
+  const [addBuyQty, setAddBuyQty] = useState<number>(1);
+  const [addBuyPrice, setAddBuyPrice] = useState<number>(0);
+
+  const handleOpenCalculator = (idx: number) => {
+    if (calcOpenIdx === idx) {
+      setCalcOpenIdx(null);
+      return;
+    }
+    setCalcOpenIdx(idx);
+    setAddBuyQty(1);
+    setAddBuyPrice(holdings[idx].avgPrice || 10000);
+  };
+
+  const handleApplyAddBuy = (idx: number) => {
+    const current = holdings[idx];
+    const addedQty = Number(addBuyQty) || 0;
+    const addedPrice = Number(addBuyPrice) || 0;
+
+    if (addedQty <= 0 || addedPrice <= 0) {
+      alert('추가 매수 수량과 매수 단가를 올바르게 입력해주세요.');
+      return;
+    }
+
+    const totalQty = current.quantity + addedQty;
+    const totalCost =
+      current.quantity * current.avgPrice + addedQty * addedPrice;
+    const newAvg = Math.round(totalCost / totalQty);
+
+    const updated = [...holdings];
+    updated[idx] = {
+      ...current,
+      quantity: totalQty,
+      avgPrice: newAvg,
+    };
+    setHoldings(updated);
+    setCalcOpenIdx(null);
+  };
+
+  const handleMoveHolding = (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= holdings.length) return;
+    const updated = [...holdings];
+    const temp = updated[index];
+    updated[index] = updated[targetIdx];
+    updated[targetIdx] = temp;
+    setHoldings(updated);
+    if (calcOpenIdx === index) setCalcOpenIdx(targetIdx);
+    else if (calcOpenIdx === targetIdx) setCalcOpenIdx(index);
+  };
+
   const handleUpdateHolding = (
     index: number,
     field: 'quantity' | 'avgPrice',
@@ -43,6 +104,7 @@ export const AccountEditorModal: React.FC<AccountEditorModalProps> = ({
   const handleRemoveHolding = (index: number) => {
     if (confirm(`'${holdings[index].name}' 종목을 계좌에서 삭제하시겠습니까?`)) {
       setHoldings(holdings.filter((_, i) => i !== index));
+      if (calcOpenIdx === index) setCalcOpenIdx(null);
     }
   };
 
@@ -92,7 +154,7 @@ export const AccountEditorModal: React.FC<AccountEditorModalProps> = ({
               </span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              보유 주식 수량, 매입단가 및 예수금을 직접 변경할 수 있습니다.
+              보유 수량·평단가 수정, 추가매수 자동 계산 및 종목 순서 변경이 가능합니다.
             </p>
           </div>
           <button
@@ -148,7 +210,7 @@ export const AccountEditorModal: React.FC<AccountEditorModalProps> = ({
                       type="text"
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      placeholder="예: TIGER 미국배당다우존스"
+                      placeholder="예: TIGER 200"
                       className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white"
                       required
                     />
@@ -161,7 +223,7 @@ export const AccountEditorModal: React.FC<AccountEditorModalProps> = ({
                       type="text"
                       value={newCode}
                       onChange={(e) => setNewCode(e.target.value)}
-                      placeholder="예: 458730"
+                      placeholder="예: 102110"
                       className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white uppercase font-mono"
                       required
                     />
@@ -199,69 +261,187 @@ export const AccountEditorModal: React.FC<AccountEditorModalProps> = ({
             )}
 
             {/* Holdings Table */}
-            <div className="space-y-2">
-              {holdings.map((h, idx) => (
-                <div
-                  key={h.code}
-                  className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-                >
-                  <div className="min-w-[140px]">
-                    <div className="text-xs font-bold text-white">{h.name}</div>
-                    <div className="text-[11px] text-slate-400 font-mono">
-                      {h.code}
+            <div className="space-y-2.5">
+              {holdings.map((h, idx) => {
+                const isCalcOpen = calcOpenIdx === idx;
+                const previewTotalQty = h.quantity + (Number(addBuyQty) || 0);
+                const previewNewAvg =
+                  previewTotalQty > 0
+                    ? Math.round(
+                        (h.quantity * h.avgPrice +
+                          (Number(addBuyQty) || 0) * (Number(addBuyPrice) || 0)) /
+                          previewTotalQty
+                      )
+                    : h.avgPrice;
+
+                return (
+                  <div
+                    key={h.code}
+                    className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2.5"
+                  >
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-[150px]">
+                        {/* Up/Down Reorder Buttons */}
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveHolding(idx, 'up')}
+                            disabled={idx === 0}
+                            className="p-0.5 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-20"
+                            title="위로 이동"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveHolding(idx, 'down')}
+                            disabled={idx === holdings.length - 1}
+                            className="p-0.5 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-20"
+                            title="아래로 이동"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div>
+                          <div className="text-xs font-bold text-white">
+                            {h.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono">
+                            {h.code}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+                        <div>
+                          <label className="text-[10px] text-slate-500 block">
+                            수량(주)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={h.quantity}
+                            onChange={(e) =>
+                              handleUpdateHolding(
+                                idx,
+                                'quantity',
+                                parseInt(e.target.value) || 0
+                              )
+                            }
+                            className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-right font-medium"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-slate-500 block">
+                            평균단가(원)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={h.avgPrice}
+                            onChange={(e) =>
+                              handleUpdateHolding(
+                                idx,
+                                'avgPrice',
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-28 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-right font-medium"
+                          />
+                        </div>
+
+                        {/* 추가매수 평단가 계산기 토글 버튼 */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCalculator(idx)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 border transition-all mt-3 sm:mt-0 ${
+                            isCalcOpen
+                              ? 'bg-indigo-600 text-white border-indigo-500'
+                              : 'bg-slate-900 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/10'
+                          }`}
+                          title="추가 매수 시 평단가 자동 계산"
+                        >
+                          <Calculator className="w-3.5 h-3.5" />
+                          <span>추가매수</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveHolding(idx)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors mt-3 sm:mt-0"
+                          title="종목 삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
+
+                    {/* 추가 매수 평단가 자동 계산기 패널 */}
+                    {isCalcOpen && (
+                      <div className="bg-indigo-950/30 border border-indigo-500/30 rounded-xl p-3 pt-2.5 text-xs space-y-2.5 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between text-indigo-300 font-semibold">
+                          <span>🧮 추가 매수 평단가 자동 계산기</span>
+                          <span className="text-[11px] text-slate-400 font-normal">
+                            기존: {h.quantity}주 × {h.avgPrice.toLocaleString('ko-KR')}원
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
+                          <div>
+                            <label className="text-[11px] text-slate-300 block mb-1">
+                              추가 매수 수량 (주)
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={addBuyQty}
+                              onChange={(e) =>
+                                setAddBuyQty(parseInt(e.target.value) || 0)
+                              }
+                              className="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-2.5 py-1.5 text-white font-semibold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] text-slate-300 block mb-1">
+                              추가 매수 단가 (원)
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={addBuyPrice}
+                              onChange={(e) =>
+                                setAddBuyPrice(parseFloat(e.target.value) || 0)
+                              }
+                              className="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-2.5 py-1.5 text-white font-semibold"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleApplyAddBuy(idx)}
+                            className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg flex items-center justify-center gap-1 transition-all shadow"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>합산 반영</span>
+                          </button>
+                        </div>
+
+                        {/* 실시간 미리보기 */}
+                        <div className="flex items-center justify-between pt-2 border-t border-indigo-500/20 text-[11px]">
+                          <span className="text-slate-400">합산 후 예상 결과:</span>
+                          <div className="font-bold text-emerald-400">
+                            총 {previewTotalQty.toLocaleString('ko-KR')}주 · 새 평단가{' '}
+                            {previewNewAvg.toLocaleString('ko-KR')}원
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">
-                        수량(주)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={h.quantity}
-                        onChange={(e) =>
-                          handleUpdateHolding(
-                            idx,
-                            'quantity',
-                            parseInt(e.target.value) || 0
-                          )
-                        }
-                        className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-right font-medium"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">
-                        평균단가(원)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={h.avgPrice}
-                        onChange={(e) =>
-                          handleUpdateHolding(
-                            idx,
-                            'avgPrice',
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                        className="w-28 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-right font-medium"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveHolding(idx)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors mt-3 sm:mt-0"
-                      title="종목 삭제"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

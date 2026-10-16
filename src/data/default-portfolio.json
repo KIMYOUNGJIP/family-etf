@@ -9,6 +9,12 @@
       "cash": 0,
       "holdings": [
         {
+          "code": "102110",
+          "name": "TIGER 200",
+          "quantity": 16,
+          "avgPrice": 88860
+        },
+        {
           "code": "0167A0",
           "name": "SOL AI반도체TOP2플러스",
           "quantity": 570,
@@ -25,12 +31,6 @@
           "name": "TIME 미국나스닥100액티브",
           "quantity": 67,
           "avgPrice": 58702
-        },
-        {
-          "code": "102110",
-          "name": "TIGER 200",
-          "quantity": 16,
-          "avgPrice": 88860
         }
       ]
     },

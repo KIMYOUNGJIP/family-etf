@@ -32,12 +32,14 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
   const kospi = indices['KOSPI'];
   const kosdaq = indices['KOSDAQ'];
   const nq = indices['NQ'];
+  const usdkrw = indices['USDKRW'];
   const fut = indices['FUT'];
 
   if (!isMounted) {
     return (
       <div className="mb-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
           <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
           <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
           <div className="h-44 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
@@ -56,7 +58,8 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
     const isUp = item.diffPrice >= 0;
     const strokeColor = isUp ? '#f43f5e' : '#3b82f6';
     const gradientId = `gradient-${item.code}`;
-    const unit = item.code === 'NQ' ? 'pt' : 'p';
+    const unit =
+      item.code === 'NQ' ? 'pt' : item.code === 'USDKRW' ? '원' : 'p';
 
     // Compute min and max for Y-axis domain
     const prices = item.chartPoints.map((p) => p.price);
@@ -270,26 +273,30 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
     );
   };
 
-  // 미니나스닥 100 선물 마켓 브리핑 카드 (CME 선물은 당일 실시간 투자자별 수급이 미제공되므로 마켓 동향 브리핑 제공)
-  const renderNasdaqOverviewCard = (item?: MarketIndexData) => {
-    if (!item) {
+  // 미니나스닥 100 선물 및 환율 마켓 브리핑 카드
+  const renderNasdaqOverviewCard = (
+    nqItem?: MarketIndexData,
+    fxItem?: MarketIndexData
+  ) => {
+    if (!nqItem) {
       return (
         <div className="h-36 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
       );
     }
 
-    const range = item.highPrice - item.lowPrice;
-    const prevClose = item.nowPrice - item.diffPrice;
+    const range = nqItem.highPrice - nqItem.lowPrice;
+    const combinedEffect = nqItem.diffRate + (fxItem?.diffRate || 0);
+    const isCombinedPositive = combinedEffect >= 0;
 
     return (
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl hover:border-slate-700 transition-all flex flex-col justify-between">
         <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 mb-2">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold text-white">
-              미니나스닥 100 선물 현황
+              나스닥 선물 · 환율 브리핑
             </span>
             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              CME Globex
+              CME · FX
             </span>
           </div>
           <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
@@ -300,21 +307,41 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
 
         <div className="space-y-1.5 text-xs">
           <div className="flex items-center justify-between py-1">
-            <span className="text-slate-400 font-medium">당일 변동폭</span>
+            <span className="text-slate-400 font-medium">선물 당일 변동폭</span>
             <span className="font-bold font-mono text-white">
               {range.toFixed(2)} pt
             </span>
           </div>
           <div className="flex items-center justify-between py-1">
-            <span className="text-slate-400 font-medium">전일 종가</span>
-            <span className="font-mono text-slate-300">
-              {prevClose.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pt
-            </span>
+            <span className="text-slate-400 font-medium">원/달러 실시간</span>
+            {fxItem ? (
+              <span
+                className={`font-bold font-mono ${
+                  fxItem.diffPrice >= 0 ? 'text-rose-400' : 'text-blue-400'
+                }`}
+              >
+                {fxItem.nowPrice.toLocaleString('ko-KR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+                원 ({fxItem.diffPrice >= 0 ? '+' : ''}
+                {fxItem.diffRate.toFixed(2)}%)
+              </span>
+            ) : (
+              <span className="text-slate-500 font-mono">수신 중...</span>
+            )}
           </div>
           <div className="flex items-center justify-between py-1">
-            <span className="text-slate-400 font-medium">기준 통화</span>
-            <span className="font-bold text-indigo-400 font-mono">
-              USD ($) · E-mini
+            <span className="text-slate-400 font-medium" title="나스닥 선물 등락률 + 원/달러 환율 등락률">
+              미국ETF 체감 등락(선물+환율)
+            </span>
+            <span
+              className={`font-bold font-mono ${
+                isCombinedPositive ? 'text-rose-400' : 'text-blue-400'
+              }`}
+            >
+              {isCombinedPositive ? '+' : ''}
+              {combinedEffect.toFixed(2)}%
             </span>
           </div>
         </div>
@@ -328,25 +355,26 @@ export const MarketIndices: React.FC<MarketIndicesProps> = ({
       <div className="flex items-center justify-between px-1">
         <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5 text-indigo-400" />
-          <span>국내외 대표 지수 및 나스닥 선물 실시간 동향</span>
+          <span>국내외 대표 지수 · 나스닥 선물 · 원/달러 환율 실시간 동향</span>
         </h3>
         <span className="text-[11px] text-slate-400">
-          코스피 · 코스닥 · 미니나스닥 100 선물 실시간 분봉 및 시장 동향
+          코스피 · 코스닥 · 미니나스닥 100 선물 · USD/KRW 실시간 분봉 및 수급
         </span>
       </div>
 
-      {/* 2. Top Row: 3 Indices Intraday Charts (KOSPI | KOSDAQ | NQ) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 2. Top Row: 4 Indices Intraday Charts (KOSPI | KOSDAQ | NQ | USDKRW) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {renderIndexCard(kospi, '코스피')}
         {renderIndexCard(kosdaq, '코스닥')}
         {renderIndexCard(nq || fut, '미니나스닥 100 선물')}
+        {renderIndexCard(usdkrw, '원/달러 환율')}
       </div>
 
-      {/* 3. Bottom Row: Investor Trends & Nasdaq Overview */}
+      {/* 3. Bottom Row: Investor Trends & Nasdaq/FX Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {renderTrendCard(investorTrends['KOSPI'])}
         {renderTrendCard(investorTrends['KOSDAQ'])}
-        {renderNasdaqOverviewCard(nq)}
+        {renderNasdaqOverviewCard(nq, usdkrw)}
       </div>
     </div>
   );
