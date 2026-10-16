@@ -136,7 +136,7 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ accounts }) => {
           <div>
             <div className="text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
               <span>ETF 종목별 평가액 비중</span>
-              <span className="text-[11px] text-slate-500">총 6종</span>
+              <span className="text-[11px] text-slate-500">총 {holdingList.length}종</span>
             </div>
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">

@@ -23,7 +23,7 @@ import { AccountEditorModal } from '@/components/AccountEditorModal';
 import { TelegramSettingsModal } from '@/components/TelegramSettingsModal';
 import { DataBackupModal } from '@/components/DataBackupModal';
 
-const STORAGE_PORTFOLIO_KEY = 'family_etf_portfolio_v2';
+const STORAGE_PORTFOLIO_KEY = 'family_etf_portfolio_v3';
 const STORAGE_TELEGRAM_KEY = 'family_etf_telegram_config_v1';
 const REFRESH_INTERVAL_SEC = 15;
 

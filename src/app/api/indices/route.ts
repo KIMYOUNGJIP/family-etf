@@ -141,6 +141,84 @@ async function fetchInvestorTrend(code: 'KOSPI' | 'KOSDAQ' | 'FUT'): Promise<Inv
   }
 }
 
+async function fetchNasdaqFuturesData(): Promise<MarketIndexData | null> {
+  try {
+    const url =
+      'https://query1.finance.yahoo.com/v8/finance/chart/NQ=F?interval=2m&range=1d';
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'application/json',
+      },
+      next: { revalidate: 10 },
+    });
+
+    if (!res.ok) {
+      console.error(`Failed to fetch NQ=F: ${res.status}`);
+      return null;
+    }
+
+    const json = await res.json();
+    const result = json?.chart?.result?.[0];
+    if (!result) return null;
+
+    const meta = result.meta;
+    const timestamps: number[] = result.timestamp || [];
+    const closes: (number | null)[] =
+      result.indicators?.quote?.[0]?.close || [];
+
+    const nowPrice = parseNumber(meta.regularMarketPrice);
+    const prevClose = parseNumber(
+      meta.chartPreviousClose || meta.previousClose
+    );
+    const diffPrice = prevClose > 0 ? nowPrice - prevClose : 0;
+    const diffRate =
+      prevClose > 0 ? ((nowPrice - prevClose) / prevClose) * 100 : 0;
+
+    const highPrice = parseNumber(meta.regularMarketDayHigh || nowPrice);
+    const lowPrice = parseNumber(meta.regularMarketDayLow || nowPrice);
+
+    // Chart points (KST HH:mm)
+    const chartPoints: MarketIndexPoint[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const price = closes[i];
+      if (price !== null && price !== undefined && !isNaN(price)) {
+        const date = new Date(timestamps[i] * 1000);
+        const timeStr = date.toLocaleTimeString('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        });
+        chartPoints.push({
+          time: timeStr,
+          price: Number(price.toFixed(2)),
+        });
+      }
+    }
+
+    const openPrice =
+      chartPoints.length > 0 ? chartPoints[0].price : nowPrice;
+
+    return {
+      code: 'NQ',
+      name: '미니나스닥 100 선물',
+      nowPrice,
+      diffPrice,
+      diffRate,
+      openPrice,
+      highPrice,
+      lowPrice,
+      chartPoints,
+      updatedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error('Error fetching Nasdaq futures:', err);
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const now = Date.now();
   if (cachedPayload && now - cachedPayload.timestamp < CACHE_TTL_MS) {
@@ -151,19 +229,22 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const [kospi, kosdaq, fut, kospiTrend, kosdaqTrend, futTrend] = await Promise.all([
-    fetchIndexData('KOSPI'),
-    fetchIndexData('KOSDAQ'),
-    fetchIndexData('FUT'),
-    fetchInvestorTrend('KOSPI'),
-    fetchInvestorTrend('KOSDAQ'),
-    fetchInvestorTrend('FUT'),
-  ]);
+  const [kospi, kosdaq, fut, nq, kospiTrend, kosdaqTrend, futTrend] =
+    await Promise.all([
+      fetchIndexData('KOSPI'),
+      fetchIndexData('KOSDAQ'),
+      fetchIndexData('FUT'),
+      fetchNasdaqFuturesData(),
+      fetchInvestorTrend('KOSPI'),
+      fetchInvestorTrend('KOSDAQ'),
+      fetchInvestorTrend('FUT'),
+    ]);
 
   const indices: Record<string, MarketIndexData> = {};
   if (kospi) indices['KOSPI'] = kospi;
   if (kosdaq) indices['KOSDAQ'] = kosdaq;
   if (fut) indices['FUT'] = fut;
+  if (nq) indices['NQ'] = nq;
 
   const investorTrends: Record<string, InvestorTrend> = {};
   if (kospiTrend) investorTrends['KOSPI'] = kospiTrend;

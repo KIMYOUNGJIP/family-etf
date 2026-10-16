@@ -158,10 +158,10 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({
               </div>
               <div>
                 <span className="text-xs font-bold text-rose-300 block">
-                  노션 초기 데이터로 리셋
+                  최신 기본 데이터로 리셋
                 </span>
                 <span className="text-[11px] text-rose-400/80">
-                  2026-09-07 노션 원본 값으로 즉시 복구
+                  등록된 최신 기본 포트폴리오 값으로 즉시 복구
                 </span>
               </div>
             </div>

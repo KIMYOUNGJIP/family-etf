@@ -25,6 +25,12 @@
           "name": "TIME 미국나스닥100액티브",
           "quantity": 67,
           "avgPrice": 58702
+        },
+        {
+          "code": "102110",
+          "name": "TIGER 200",
+          "quantity": 16,
+          "avgPrice": 88860
         }
       ]
     },
@@ -49,13 +55,13 @@
         },
         {
           "code": "379800",
-          "name": "KODEX 미국S&P500TR",
+          "name": "KODEX 미국S&P500",
           "quantity": 132,
           "avgPrice": 22750
         },
         {
           "code": "379810",
-          "name": "KODEX 미국나스닥100TR",
+          "name": "KODEX 미국나스닥100",
           "quantity": 121,
           "avgPrice": 24481
         }
@@ -76,13 +82,13 @@
         },
         {
           "code": "379800",
-          "name": "KODEX 미국S&P500TR",
+          "name": "KODEX 미국S&P500",
           "quantity": 88,
           "avgPrice": 22735
         },
         {
           "code": "379810",
-          "name": "KODEX 미국나스닥100TR",
+          "name": "KODEX 미국나스닥100",
           "quantity": 85,
           "avgPrice": 24627
         }
