@@ -110,20 +110,53 @@ export const AccountEditorModal: React.FC<AccountEditorModalProps> = ({
 
   const handleAddHolding = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCode.trim() || !newName.trim()) {
+    const cleanCode = newCode.trim().toUpperCase();
+    const cleanName = newName.trim();
+    const qty = Number(newQuantity) || 0;
+    const price = Number(newAvgPrice) || 0;
+
+    if (!cleanCode || !cleanName) {
       alert('종목코드와 종목명을 입력해주세요.');
       return;
     }
 
-    setHoldings([
-      ...holdings,
-      {
-        code: newCode.trim().toUpperCase(),
-        name: newName.trim(),
-        quantity: Number(newQuantity) || 0,
-        avgPrice: Number(newAvgPrice) || 0,
-      },
-    ]);
+    const existingIdx = holdings.findIndex(
+      (h) => h.code.toUpperCase() === cleanCode
+    );
+
+    if (existingIdx !== -1) {
+      const existing = holdings[existingIdx];
+      if (
+        confirm(
+          `이미 보유 중인 '${existing.name} (${cleanCode})' 종목입니다.\n입력하신 수량(${qty}주)과 단가(${price.toLocaleString('ko-KR')}원)를 기존 보유분에 추가 매수로 합산하시겠습니까?`
+        )
+      ) {
+        const totalQty = existing.quantity + qty;
+        const totalCost =
+          existing.quantity * existing.avgPrice + qty * price;
+        const mergedAvg = totalQty > 0 ? Math.round(totalCost / totalQty) : existing.avgPrice;
+
+        const updated = [...holdings];
+        updated[existingIdx] = {
+          ...existing,
+          quantity: totalQty,
+          avgPrice: mergedAvg,
+        };
+        setHoldings(updated);
+      } else {
+        return;
+      }
+    } else {
+      setHoldings([
+        ...holdings,
+        {
+          code: cleanCode,
+          name: cleanName,
+          quantity: qty,
+          avgPrice: price,
+        },
+      ]);
+    }
 
     setNewCode('');
     setNewName('');

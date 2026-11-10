@@ -164,6 +164,17 @@ export async function GET(request: NextRequest) {
     const dayProfitRate =
       totalAsset - dayProfit > 0 ? (dayProfit / (totalAsset - dayProfit)) * 100 : 0;
 
+    // Second pass: populate weights for accounts and holdings
+    const weightedAccounts: CalculatedAccount[] = calculatedAccounts.map((acc) => ({
+      ...acc,
+      totalWeight: totalAsset > 0 ? (acc.totalAsset / totalAsset) * 100 : 0,
+      holdings: acc.holdings.map((h) => ({
+        ...h,
+        accountWeight: acc.totalEval > 0 ? (h.evalAmount / acc.totalEval) * 100 : 0,
+        totalWeight: totalAsset > 0 ? (h.evalAmount / totalAsset) * 100 : 0,
+      })),
+    }));
+
     const summary: PortfolioSummary = {
       totalBuy,
       totalEval,
@@ -173,7 +184,7 @@ export async function GET(request: NextRequest) {
       dayProfitRate,
       totalCash,
       totalAsset,
-      accountCount: calculatedAccounts.length,
+      accountCount: weightedAccounts.length,
       holdingsCount: defaultPortfolio.accounts.reduce(
         (sum, a) => sum + a.holdings.length,
         0
@@ -183,7 +194,7 @@ export async function GET(request: NextRequest) {
 
     const message = formatTelegramReport(
       summary,
-      calculatedAccounts,
+      weightedAccounts,
       '📊 [정기 장마감 리포트] 가족 ETF 포트폴리오'
     );
 

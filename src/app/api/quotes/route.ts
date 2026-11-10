@@ -25,15 +25,19 @@ async function fetchNaverQuote(code: string): Promise<StockQuote | null> {
   }
 
   try {
-    const url = `https://m.stock.naver.com/api/stock/${cleanCode}/basic`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Referer: 'https://m.stock.naver.com/',
-      },
-      next: { revalidate: 10 },
-    });
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Referer: 'https://m.stock.naver.com/',
+    };
+
+    const basicUrl = `https://m.stock.naver.com/api/stock/${cleanCode}/basic`;
+    const integrationUrl = `https://m.stock.naver.com/api/stock/${cleanCode}/integration`;
+
+    const [res, intRes] = await Promise.all([
+      fetch(basicUrl, { headers, next: { revalidate: 10 } }),
+      fetch(integrationUrl, { headers, next: { revalidate: 10 } }).catch(() => null),
+    ]);
 
     if (!res.ok) {
       console.error(`Failed to fetch ${cleanCode}: HTTP ${res.status}`);
@@ -63,11 +67,22 @@ async function fetchNaverQuote(code: string): Promise<StockQuote | null> {
       diffRate = -diffRate;
     }
 
-    const highPrice = parseNumber(data.highPrc);
-    const lowPrice = parseNumber(data.lowPrc);
-    const openPrice = parseNumber(data.openPrc);
-    const volume = parseNumber(data.volume);
+    let highPrice = parseNumber(data.highPrc);
+    let lowPrice = parseNumber(data.lowPrc);
+    let openPrice = parseNumber(data.openPrc);
+    let volume = parseNumber(data.volume);
     const prevClose = nowPrice - diffPrice;
+
+    if (intRes && intRes.ok && (!highPrice || !lowPrice || !openPrice)) {
+      const intData = await intRes.json();
+      const totalInfos: any[] = intData.totalInfos || [];
+      for (const info of totalInfos) {
+        if (info.code === 'openPrice' && !openPrice) openPrice = parseNumber(info.value);
+        if (info.code === 'highPrice' && !highPrice) highPrice = parseNumber(info.value);
+        if (info.code === 'lowPrice' && !lowPrice) lowPrice = parseNumber(info.value);
+        if (info.code === 'accumulatedTradingVolume' && !volume) volume = parseNumber(info.value);
+      }
+    }
 
     const quote: StockQuote = {
       code: cleanCode,

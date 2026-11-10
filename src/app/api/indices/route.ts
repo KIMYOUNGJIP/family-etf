@@ -66,16 +66,23 @@ async function fetchIndexData(code: 'KOSPI' | 'KOSDAQ' | 'FUT'): Promise<MarketI
     let diffRate = parseNumber(basicJson.fluctuationsRatio);
     if (isFalling && diffRate > 0) diffRate = -diffRate;
 
-    const openPrice = parseNumber(basicJson.openPrice || basicJson.openPrc);
-    const highPrice = parseNumber(basicJson.highPrice || basicJson.highPrc);
-    const lowPrice = parseNumber(basicJson.lowPrice || basicJson.lowPrc);
+    let openPrice = parseNumber(basicJson.openPrice || basicJson.openPrc);
+    let highPrice = parseNumber(basicJson.highPrice || basicJson.highPrc);
+    let lowPrice = parseNumber(basicJson.lowPrice || basicJson.lowPrc);
 
-    // Parse intraday points
+    // Parse intraday points & fallback open/high/low from chart API
     const chartPoints: MarketIndexPoint[] = [];
     if (chartRes.ok) {
       const chartJson = await chartRes.json();
+      if (!openPrice && chartJson.openPrice) {
+        openPrice = parseNumber(chartJson.openPrice);
+      }
+
       const rawPoints = chartJson.priceInfos || [];
-      rawPoints.forEach((pt: any) => {
+      let calcHigh = 0;
+      let calcLow = Infinity;
+
+      rawPoints.forEach((pt: any, idx: number) => {
         const rawTime = String(pt.localDateTime || '');
         // format HH:mm from YYYYMMDDHHmmss
         const timeStr =
@@ -83,11 +90,28 @@ async function fetchIndexData(code: 'KOSPI' | 'KOSDAQ' | 'FUT'): Promise<MarketI
             ? `${rawTime.substring(8, 10)}:${rawTime.substring(10, 12)}`
             : rawTime;
         const price = parseNumber(pt.currentPrice || pt.closePrice);
+        const ptHigh = parseNumber(pt.highPrice) || price;
+        const ptLow = parseNumber(pt.lowPrice) || price;
+        const ptOpen = parseNumber(pt.openPrice) || price;
+
+        if (idx === 0 && !openPrice && ptOpen > 0) {
+          openPrice = ptOpen;
+        }
+        if (ptHigh > calcHigh) calcHigh = ptHigh;
+        if (ptLow > 0 && ptLow < calcLow) calcLow = ptLow;
+
         if (price > 0) {
           chartPoints.push({ time: timeStr, price });
         }
       });
+
+      if (!highPrice && calcHigh > 0) highPrice = calcHigh;
+      if (!lowPrice && calcLow < Infinity) lowPrice = calcLow;
     }
+
+    if (!openPrice) openPrice = nowPrice;
+    if (!highPrice) highPrice = nowPrice;
+    if (!lowPrice) lowPrice = nowPrice;
 
     return {
       code,
@@ -147,18 +171,21 @@ async function fetchYahooChartData(
   symbol: string,
   code: string,
   name: string,
-  interval = '2m'
+  interval = '2m',
+  range = '1d'
 ): Promise<MarketIndexData | null> {
   try {
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'application/json',
+    };
+
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       symbol
-    )}?interval=${interval}&range=1d`;
+    )}?interval=${interval}&range=${range}`;
     const res = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'application/json',
-      },
+      headers,
       next: { revalidate: 10 },
     });
 
@@ -168,27 +195,55 @@ async function fetchYahooChartData(
     }
 
     const json = await res.json();
-    const result = json?.chart?.result?.[0];
+    let result = json?.chart?.result?.[0];
     if (!result) return null;
 
     const meta = result.meta;
-    const timestamps: number[] = result.timestamp || [];
-    const closes: (number | null)[] =
+    let timestamps: number[] = result.timestamp || [];
+    let closes: (number | null)[] =
       result.indicators?.quote?.[0]?.close || [];
+
+    // Fallback: CME futures (e.g. NQ=F) sometimes return empty timestamps for range=1d
+    if (timestamps.length === 0 && range === '1d') {
+      const fallbackUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+        symbol
+      )}?interval=5m&range=2d`;
+      const fbRes = await fetch(fallbackUrl, {
+        headers,
+        next: { revalidate: 10 },
+      });
+      if (fbRes.ok) {
+        const fbJson = await fbRes.json();
+        const fbResult = fbJson?.chart?.result?.[0];
+        if (fbResult?.timestamp?.length) {
+          timestamps = fbResult.timestamp;
+          closes = fbResult.indicators?.quote?.[0]?.close || [];
+        }
+      }
+    }
 
     const nowPrice = parseNumber(meta.regularMarketPrice);
     const prevClose = parseNumber(
-      meta.chartPreviousClose || meta.previousClose
+      meta.previousClose || meta.chartPreviousClose
     );
-    const diffPrice = prevClose > 0 ? nowPrice - prevClose : 0;
+    const diffPrice =
+      meta.fulldayChange !== undefined
+        ? parseNumber(meta.fulldayChange)
+        : prevClose > 0
+        ? nowPrice - prevClose
+        : 0;
     const diffRate =
-      prevClose > 0 ? ((nowPrice - prevClose) / prevClose) * 100 : 0;
+      meta.fulldayChangePercent !== undefined
+        ? parseNumber(meta.fulldayChangePercent)
+        : prevClose > 0
+        ? ((nowPrice - prevClose) / prevClose) * 100
+        : 0;
 
     const highPrice = parseNumber(meta.regularMarketDayHigh || nowPrice);
     const lowPrice = parseNumber(meta.regularMarketDayLow || nowPrice);
 
-    // Chart points (KST HH:mm)
-    const chartPoints: MarketIndexPoint[] = [];
+    // Chart points (KST HH:mm) - keep latest ~180 points (up to 15 hours for 5m) for clean intraday view
+    const rawPoints: MarketIndexPoint[] = [];
     for (let i = 0; i < timestamps.length; i++) {
       const price = closes[i];
       if (price !== null && price !== undefined && !isNaN(price) && price > 0) {
@@ -199,12 +254,14 @@ async function fetchYahooChartData(
           minute: '2-digit',
           hour12: false,
         });
-        chartPoints.push({
+        rawPoints.push({
           time: timeStr,
           price: Number(price.toFixed(2)),
         });
       }
     }
+
+    const chartPoints = rawPoints.slice(-180);
 
     const openPrice =
       chartPoints.length > 0 ? chartPoints[0].price : nowPrice;

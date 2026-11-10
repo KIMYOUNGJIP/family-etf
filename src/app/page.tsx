@@ -315,6 +315,66 @@ export default function DashboardPage() {
     });
   };
 
+  // Auto-send daily market-close Telegram report on weekdays at alertTime (default 15:35 KST)
+  useEffect(() => {
+    if (!telegramConfig.enabled) return;
+    if (!telegramConfig.botToken.trim() || !telegramConfig.chatId.trim()) return;
+    if (Object.keys(quotes).length === 0) return;
+
+    const checkAndSendDailyReport = async () => {
+      const now = new Date();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      const kst = new Date(utc + 3600000 * 9);
+
+      const dayOfWeek = kst.getDay(); // 0: Sun, 6: Sat
+      if (dayOfWeek === 0 || dayOfWeek === 6) return;
+
+      const todayStr = `${kst.getFullYear()}-${String(
+        kst.getMonth() + 1
+      ).padStart(2, '0')}-${String(kst.getDate()).padStart(2, '0')}`;
+
+      if (telegramConfig.lastSentDate === todayStr) return;
+
+      const [targetHour, targetMin] = (telegramConfig.alertTime || '15:35')
+        .split(':')
+        .map((n) => parseInt(n, 10));
+      const currentMinutes = kst.getHours() * 60 + kst.getMinutes();
+      const targetMinutes =
+        (isNaN(targetHour) ? 15 : targetHour) * 60 +
+        (isNaN(targetMin) ? 35 : targetMin);
+
+      // Trigger between alertTime (15:35) and 16:30 KST if not yet sent today
+      if (currentMinutes >= targetMinutes && currentMinutes <= 16 * 60 + 30) {
+        try {
+          // Mark as sent immediately to prevent duplicate triggers
+          const updatedConfig: TelegramConfig = {
+            ...telegramConfig,
+            lastSentDate: todayStr,
+          };
+          saveTelegramConfig(updatedConfig);
+
+          await fetch('/api/alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              botToken: telegramConfig.botToken.trim(),
+              chatId: telegramConfig.chatId.trim(),
+              summary,
+              accounts: calculatedAccounts,
+              isTest: false,
+            }),
+          });
+        } catch (err) {
+          console.error('Failed to auto-send daily Telegram report:', err);
+        }
+      }
+    };
+
+    const timer = setInterval(checkAndSendDailyReport, 30_000);
+    checkAndSendDailyReport();
+    return () => clearInterval(timer);
+  }, [telegramConfig, quotes, summary, calculatedAccounts, saveTelegramConfig]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* Top Header */}
