@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StockQuote } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 // Simple in-memory cache to prevent Naver rate limits (10 seconds)
 const cache: Record<string, { quote: StockQuote; timestamp: number }> = {};
 const CACHE_TTL_MS = 10_000;

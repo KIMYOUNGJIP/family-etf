@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MarketIndexData, MarketIndexPoint, InvestorTrend } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 interface CachedData {
   indices: Record<string, MarketIndexData>;
   investorTrends: Record<string, InvestorTrend>;
